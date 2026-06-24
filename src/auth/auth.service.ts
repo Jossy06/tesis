@@ -1,8 +1,4 @@
-import {
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
-
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 
@@ -17,14 +13,10 @@ export class AuthService {
   ) {}
 
   async login(loginDto: LoginDto) {
-    const user = await this.usersService.findByEmail(
-      loginDto.email,
-    );
+    const user = await this.usersService.findByEmail(loginDto.email);
 
     if (!user) {
-      throw new UnauthorizedException(
-        'Correo o contraseña incorrectos',
-      );
+      throw new UnauthorizedException('Correo o contraseña incorrectos');
     }
 
     const passwordMatch = await bcrypt.compare(
@@ -33,9 +25,7 @@ export class AuthService {
     );
 
     if (!passwordMatch) {
-      throw new UnauthorizedException(
-        'Correo o contraseña incorrectos',
-      );
+      throw new UnauthorizedException('Correo o contraseña incorrectos');
     }
 
     const payload = {
@@ -45,7 +35,7 @@ export class AuthService {
     };
 
     return {
-      access_token: this.jwtService.sign(payload),
+      access_token: await this.jwtService.signAsync(payload),
       user: {
         id: user.id,
         name: user.name,
