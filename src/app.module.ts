@@ -10,6 +10,11 @@ import { ServiceMaterialsModule } from './service-materials/service-materials.mo
 import { CalculationsModule } from './calculations/calculations.module';
 import { ClientsModule } from './clients/clients.module';
 import { AppointmentsModule } from './appointments/appointments.module';
+import { InvoicesModule } from './invoices/invoices.module';
+import { InvoiceDetailsModule } from './invoice-details/invoice-details.module';
+import { DashboardModule } from './dashboard/dashboard.module';
+import { ReportsModule } from './reports/reports.module';
+import { SettingsModule } from './settings/settings.module';
 
 @Module({
   imports: [
@@ -44,6 +49,11 @@ import { AppointmentsModule } from './appointments/appointments.module';
     CalculationsModule,
     ClientsModule,
     AppointmentsModule,
+    InvoicesModule,
+    InvoiceDetailsModule,
+    DashboardModule,
+    ReportsModule,
+    SettingsModule,
   ],
 })
 export class AppModule {}
