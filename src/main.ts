@@ -1,15 +1,29 @@
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-
-import {
-  DocumentBuilder,
-  SwaggerModule,
-} from '@nestjs/swagger';
+import { ConfigService } from '@nestjs/config';
 
 import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  const config = app.get(ConfigService);
+
+  console.log('========== CONFIG ==========');
+  console.log('DB_HOST:', config.get('DB_HOST'));
+  console.log('DB_PORT:', config.get('DB_PORT'));
+  console.log('DB_DATABASE:', config.get('DB_DATABASE'));
+  console.log('============================');
+
+  app.enableCors({
+    origin: true,
+    credentials: true,
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+    ],
+  });
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -19,35 +33,10 @@ async function bootstrap() {
     }),
   );
 
-  // Configuración de Swagger
-  const config = new DocumentBuilder()
-    .setTitle('Beauty Cost System API')
-    .setDescription(
-      'API del Sistema de Gestión para Centro de Belleza',
-    )
-    .setVersion('1.0')
-    .addBearerAuth()
-    .build();
-
-  const document = SwaggerModule.createDocument(
-    app,
-    config,
-  );
-
-  SwaggerModule.setup(
-    'api',
-    app,
-    document,
-  );
-
-  await app.listen(process.env.PORT ?? 3000);
+  await app.listen(3000);
 
   console.log(
-    `🚀 API: http://localhost:${process.env.PORT ?? 3000}`,
-  );
-
-  console.log(
-    `📚 Swagger: http://localhost:${process.env.PORT ?? 3000}/api`,
+    '🚀 Backend corriendo en http://localhost:3000',
   );
 }
 

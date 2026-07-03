@@ -8,10 +8,17 @@ import {
   Delete,
 } from '@nestjs/common';
 
+import {
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
+
 import { ClientsService } from './clients.service';
 import { CreateClientDto } from './dto/create-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
 
+@ApiTags('Clients')
 @Controller('clients')
 export class ClientsController {
   constructor(
@@ -19,39 +26,36 @@ export class ClientsController {
   ) {}
 
   @Post()
-  create(
-    @Body() createClientDto: CreateClientDto,
-  ) {
+  @ApiOperation({ summary: 'Crear cliente' })
+  @ApiResponse({ status: 201, description: 'Cliente creado correctamente' })
+  create(@Body() createClientDto: CreateClientDto) {
     return this.clientsService.create(createClientDto);
   }
 
   @Get()
+  @ApiOperation({ summary: 'Listar clientes' })
   findAll() {
     return this.clientsService.findAll();
   }
 
   @Get(':id')
-  findOne(
-    @Param('id') id: string,
-  ) {
+  @ApiOperation({ summary: 'Obtener cliente por ID' })
+  findOne(@Param('id') id: string) {
     return this.clientsService.findOne(id);
   }
 
   @Patch(':id')
+  @ApiOperation({ summary: 'Actualizar cliente' })
   update(
     @Param('id') id: string,
     @Body() updateClientDto: UpdateClientDto,
   ) {
-    return this.clientsService.update(
-      id,
-      updateClientDto,
-    );
+    return this.clientsService.update(id, updateClientDto);
   }
 
   @Delete(':id')
-  remove(
-    @Param('id') id: string,
-  ) {
+  @ApiOperation({ summary: 'Eliminar cliente' })
+  remove(@Param('id') id: string) {
     return this.clientsService.remove(id);
   }
 }

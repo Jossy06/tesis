@@ -19,88 +19,87 @@ export class AuthService {
     private readonly jwtService: JwtService,
   ) {}
 
-  async register(registerDto: RegisterDto) {
-    const existingUser =
-      await this.usersService.findByEmail(
-        registerDto.email,
-      );
+ async register(registerDto: RegisterDto) {
+  const existingUser =
+    await this.usersService.findByEmail(
+      registerDto.email,
+    );
 
-    if (existingUser) {
-      throw new ConflictException(
-        'El correo ya está registrado',
-      );
-    }
-
-    const hashedPassword =
-      await bcrypt.hash(
-        registerDto.password,
-        10,
-      );
-
-    const user =
-      await this.usersService.create({
-        ...registerDto,
-        password: hashedPassword,
-      });
-
-    const payload = {
-      sub: user.id,
-      email: user.email,
-      role: user.role,
-    };
-
-    return {
-      message: 'Usuario registrado correctamente',
-      access_token:
-        await this.jwtService.signAsync(payload),
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      },
-    };
+  if (existingUser) {
+    throw new ConflictException(
+      'El correo ya está registrado',
+    );
   }
 
+  const user =
+    await this.usersService.create(registerDto);
+
+  const payload = {
+    sub: user.id,
+    email: user.email,
+    role: user.role,
+  };
+
+  return {
+    message: 'Usuario registrado correctamente',
+    access_token:
+      await this.jwtService.signAsync(payload),
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+    },
+  };
+}
   async login(loginDto: LoginDto) {
-    const user =
-      await this.usersService.findByEmail(
-        loginDto.email,
-      );
+  console.log('========== LOGIN ==========');
+  console.log('Email recibido:', loginDto.email);
+  console.log('Password recibida:', loginDto.password);
 
-    if (!user) {
-      throw new UnauthorizedException(
-        'Correo o contraseña incorrectos',
-      );
-    }
+  const user = await this.usersService.findByEmail(
+    loginDto.email,
+  );
 
-    const passwordMatch =
-      await bcrypt.compare(
-        loginDto.password,
-        user.password,
-      );
+  console.log('Usuario encontrado:', user);
 
-    if (!passwordMatch) {
-      throw new UnauthorizedException(
-        'Correo o contraseña incorrectos',
-      );
-    }
+  if (!user) {
+    console.log('NO EXISTE EL USUARIO');
+    throw new UnauthorizedException(
+      'Correo o contraseña incorrectos',
+    );
+  }
 
-    const payload = {
-      sub: user.id,
+  console.log('Password guardada:', user.password);
+
+  const passwordMatch = await bcrypt.compare(
+    loginDto.password,
+    user.password,
+  );
+
+  console.log('Coinciden:', passwordMatch);
+
+  if (!passwordMatch) {
+    console.log('PASSWORD INCORRECTA');
+    throw new UnauthorizedException(
+      'Correo o contraseña incorrectos',
+    );
+  }
+
+  const payload = {
+    sub: user.id,
+    email: user.email,
+    role: user.role,
+  };
+
+  return {
+    access_token: await this.jwtService.signAsync(payload),
+    user: {
+      id: user.id,
+      name: user.name,
       email: user.email,
       role: user.role,
-    };
-
-    return {
-      access_token:
-        await this.jwtService.signAsync(payload),
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      },
-    };
-  }
+    },
+  };
+}
 }

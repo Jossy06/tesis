@@ -74,13 +74,25 @@ export class UsersService {
     return user;
   }
 
-  async findByEmail(email: string): Promise<User | null> {
-    return await this.userRepository.findOne({
-      where: {
-        email,
-      },
-    });
-  }
+ async findByEmail(email: string): Promise<User | null> {
+  console.log('Email recibido:', email);
+
+  const users = await this.userRepository.find();
+
+  console.log('TODOS LOS USUARIOS');
+  console.table(users);
+
+  const user = await this.userRepository
+    .createQueryBuilder('user')
+    .where('LOWER(user.email) = LOWER(:email)', {
+      email,
+    })
+    .getOne();
+
+  console.log('Usuario encontrado:', user);
+
+  return user;
+}
 
   async update(
     id: string,

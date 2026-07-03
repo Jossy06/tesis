@@ -24,30 +24,6 @@ export class DashboardService {
   ) {}
 
   async getDashboard() {
-    const totalClients = await this.clientRepository.count();
-
-    const totalServices = await this.serviceRepository.count();
-
-    const totalAppointments = await this.appointmentRepository.count();
-
-    const pendingAppointments =
-      await this.appointmentRepository.count({
-        where: {
-          status: 'Pendiente',
-        },
-      });
-
-    const totalInvoices =
-      await this.invoiceRepository.count();
-
-    const invoices =
-      await this.invoiceRepository.find();
-
-    const totalSales = invoices.reduce(
-      (sum, invoice) => sum + Number(invoice.total),
-      0,
-    );
-
     const today = new Date();
 
     const startOfDay = new Date(today);
@@ -72,41 +48,63 @@ export class DashboardService {
       999,
     );
 
-    const appointmentsToday =
-      await this.appointmentRepository.count({
+    const [
+      totalClients,
+      totalServices,
+      totalAppointments,
+      pendingAppointments,
+      appointmentsToday,
+      totalInvoices,
+      invoices,
+    ] = await Promise.all([
+      this.clientRepository.count(),
+
+      this.serviceRepository.count(),
+
+      this.appointmentRepository.count(),
+
+      this.appointmentRepository.count({
+        where: {
+          status: 'Pendiente',
+        },
+      }),
+
+      this.appointmentRepository.count({
         where: {
           appointment_date: Between(
             startOfDay,
             endOfDay,
           ),
         },
-      });
+      }),
+
+      this.invoiceRepository.count(),
+
+      this.invoiceRepository.find(),
+    ]);
+
+    const totalSales = invoices.reduce(
+      (sum, invoice) => sum + Number(invoice.total),
+      0,
+    );
 
     const salesToday = invoices
       .filter((invoice) => {
         const date = new Date(invoice.created_at);
-        return (
-          date >= startOfDay &&
-          date <= endOfDay
-        );
+        return date >= startOfDay && date <= endOfDay;
       })
       .reduce(
-        (sum, invoice) =>
-          sum + Number(invoice.total),
+        (sum, invoice) => sum + Number(invoice.total),
         0,
       );
 
     const salesMonth = invoices
       .filter((invoice) => {
         const date = new Date(invoice.created_at);
-        return (
-          date >= startOfMonth &&
-          date <= endOfMonth
-        );
+        return date >= startOfMonth && date <= endOfMonth;
       })
       .reduce(
-        (sum, invoice) =>
-          sum + Number(invoice.total),
+        (sum, invoice) => sum + Number(invoice.total),
         0,
       );
 
@@ -117,15 +115,9 @@ export class DashboardService {
       pendingAppointments,
       appointmentsToday,
       totalInvoices,
-      totalSales: Number(
-        totalSales.toFixed(2),
-      ),
-      salesToday: Number(
-        salesToday.toFixed(2),
-      ),
-      salesMonth: Number(
-        salesMonth.toFixed(2),
-      ),
+      totalSales: Number(totalSales.toFixed(2)),
+      salesToday: Number(salesToday.toFixed(2)),
+      salesMonth: Number(salesMonth.toFixed(2)),
     };
   }
 }

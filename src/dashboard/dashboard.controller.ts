@@ -1,4 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
+
 import { DashboardService } from './dashboard.service';
 
 @Controller('dashboard')
@@ -8,7 +9,7 @@ export class DashboardController {
   ) {}
 
   @Get()
-  getDashboard() {
-    return this.dashboardService.getDashboard();
+  async getDashboard() {
+    return await this.dashboardService.getDashboard();
   }
 }
