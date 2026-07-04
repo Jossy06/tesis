@@ -1,28 +1,30 @@
 import {
+  IsBoolean,
   IsNotEmpty,
-  IsOptional,
   IsNumber,
+  IsOptional,
   IsString,
   IsUUID,
 } from 'class-validator';
 
-export class CreateServiceDto {
+export class CreateServiceGroupDto {
   @IsString()
   @IsNotEmpty()
   name: string;
 
   @IsString()
   @IsOptional()
-  description?: string;
+  icon?: string;
 
   @IsNumber()
-  base_price: number;
+  @IsOptional()
+  sort?: number;
+
+  @IsBoolean()
+  @IsOptional()
+  is_active?: boolean;
 
   @IsUUID()
-  @IsOptional()
-  category_id?: string;
-
-  @IsUUID()
-  @IsOptional()
-  group_id?: string;
+  @IsNotEmpty()
+  category_id: string;
 }

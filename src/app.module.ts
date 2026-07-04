@@ -15,6 +15,8 @@ import { InvoiceDetailsModule } from './invoice-details/invoice-details.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { ReportsModule } from './reports/reports.module';
 import { SettingsModule } from './settings/settings.module';
+import { ServiceCategoriesModule } from './service-categories/service-categories.module';
+import { ServiceGroupsModule } from './service-groups/service-groups.module';
 
 @Module({
   imports: [
@@ -54,6 +56,8 @@ import { SettingsModule } from './settings/settings.module';
     DashboardModule,
     ReportsModule,
     SettingsModule,
+    ServiceCategoriesModule,
+    ServiceGroupsModule,
   ],
 })
 export class AppModule {}

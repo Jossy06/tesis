@@ -23,12 +23,16 @@ export class ServicesService {
   }
 
   async findAll() {
-    return await this.serviceRepository.find({
-      order: {
-        created_at: 'DESC',
-      },
-    });
-  }
+  return await this.serviceRepository.find({
+    relations: {
+      category: true,
+      group: true,
+    },
+    order: {
+      created_at: 'DESC',
+    },
+  });
+}
 
   async findOne(id: string) {
     const service =
