@@ -1,26 +1,80 @@
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+
+import { ServiceCategory } from './entities/service-category.entity';
 import { CreateServiceCategoryDto } from './dto/create-service-category.dto';
 import { UpdateServiceCategoryDto } from './dto/update-service-category.dto';
 
 @Injectable()
 export class ServiceCategoriesService {
-  create(createServiceCategoryDto: CreateServiceCategoryDto) {
-    return 'This action adds a new serviceCategory';
+  constructor(
+    @InjectRepository(ServiceCategory)
+    private readonly categoryRepository:
+      Repository<ServiceCategory>,
+  ) {}
+
+  async create(
+    createServiceCategoryDto: CreateServiceCategoryDto,
+  ): Promise<ServiceCategory> {
+    const category = this.categoryRepository.create(
+      createServiceCategoryDto,
+    );
+
+    return await this.categoryRepository.save(category);
   }
 
-  findAll() {
-    return `This action returns all serviceCategories`;
+  async findAll(): Promise<ServiceCategory[]> {
+    console.log('✅ Cargando categorías desde PostgreSQL');
+
+    return await this.categoryRepository.find({
+      order: {
+        name: 'ASC',
+      },
+    });
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} serviceCategory`;
+  async findOne(id: string): Promise<ServiceCategory> {
+    const category = await this.categoryRepository.findOne({
+      where: { id },
+    });
+
+    if (!category) {
+      throw new NotFoundException(
+        'Categoría de servicio no encontrada',
+      );
+    }
+
+    return category;
   }
 
-  update(id: number, updateServiceCategoryDto: UpdateServiceCategoryDto) {
-    return `This action updates a #${id} serviceCategory`;
+  async update(
+    id: string,
+    updateServiceCategoryDto: UpdateServiceCategoryDto,
+  ): Promise<ServiceCategory> {
+    const category = await this.findOne(id);
+
+    Object.assign(
+      category,
+      updateServiceCategoryDto,
+    );
+
+    return await this.categoryRepository.save(category);
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} serviceCategory`;
+  async remove(
+    id: string,
+  ): Promise<{ message: string }> {
+    const category = await this.findOne(id);
+
+    await this.categoryRepository.remove(category);
+
+    return {
+      message: 'Categoría eliminada correctamente',
+    };
   }
 }

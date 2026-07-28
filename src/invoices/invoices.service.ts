@@ -30,118 +30,149 @@ export class InvoicesService {
     private readonly settingRepository: Repository<Setting>,
   ) {}
 
-async create(body: any) {
-  const appointment = await this.appointmentRepository.findOne({
-    where: { id: body.appointment_id },
-    relations: {
-      client: true,
-      service: true,
-    },
-  });
+  async create(body: any) {
+    const appointment = await this.appointmentRepository.findOne({
+      where: {
+        id: body.appointment_id,
+      },
+      relations: {
+        client: true,
+        details: {
+          service: true,
+        },
+      },
+    });
 
-  if (!appointment) {
-    throw new BadRequestException('La cita no existe');
-  }
+    if (!appointment) {
+      throw new BadRequestException('La cita no existe');
+    }
 
-  const existingInvoice =
-    await this.invoiceRepository.findOne({
+    if (!appointment.details || appointment.details.length === 0) {
+      throw new BadRequestException(
+        'La cita no tiene servicios registrados',
+      );
+    }
+
+    const existingInvoice = await this.invoiceRepository.findOne({
       where: {
         appointment_id: appointment.id,
       },
     });
 
-  if (existingInvoice) {
-    throw new BadRequestException(
-      'Esta cita ya tiene una factura generada',
-    );
-  }
+    if (existingInvoice) {
+      throw new BadRequestException(
+        'Esta cita ya tiene una factura generada',
+      );
+    }
 
-  const setting = await this.settingRepository.findOne({
-    where: {},
-  });
-
-  const ivaPercentage = Number(
-    setting?.iva_percentage ?? 15,
-  );
-
-  const subtotal = Number(appointment.final_price);
-
-  const iva = Number(
-    (subtotal * (ivaPercentage / 100)).toFixed(2),
-  );
-
-  const discount = Number(body.discount ?? 0);
-
-  const total = Number(
-    (subtotal + iva - discount).toFixed(2),
-  );
-
-  const lastInvoice = await this.invoiceRepository.findOne({
-    where: {},
-    order: {
-      created_at: 'DESC',
-    },
-  });
-
-  let nextNumber = 1;
-
-  if (lastInvoice) {
-    const lastNumber = Number(
-      lastInvoice.invoice_number.replace('FAC-', ''),
-    );
-
-    nextNumber = lastNumber + 1;
-  }
-
-  const invoiceNumber = `FAC-${String(
-    nextNumber,
-  ).padStart(6, '0')}`;
-
-  const invoice = this.invoiceRepository.create({
-    invoice_number: invoiceNumber,
-    client_id: appointment.client_id,
-    appointment_id: appointment.id,
-    subtotal,
-    iva,
-    discount,
-    total,
-    status: body.status ?? 'Pendiente',
-  });
-
-  const savedInvoice =
-    await this.invoiceRepository.save(invoice);
-
-  const invoiceDetail =
-    this.invoiceDetailRepository.create({
-      invoice_id: savedInvoice.id,
-      service_id: appointment.service_id,
-      quantity: 1,
-      unit_price: appointment.final_price,
-      subtotal: appointment.final_price,
+    const setting = await this.settingRepository.findOne({
+      where: {},
     });
 
-  await this.invoiceDetailRepository.save(
-    invoiceDetail,
-  );
+    const ivaPercentage = Number(setting?.iva_percentage ?? 15);
+    const subtotal = Number(appointment.subtotal);
+    const discount = Number(
+      body.discount ?? appointment.discount ?? 0,
+    );
 
-  return await this.findOne(savedInvoice.id);
-}
+    if (discount < 0) {
+      throw new BadRequestException(
+        'El descuento no puede ser negativo',
+      );
+    }
+
+    if (discount > subtotal) {
+      throw new BadRequestException(
+        'El descuento no puede superar el subtotal',
+      );
+    }
+
+    const taxableAmount = subtotal - discount;
+    const iva = Number(
+      (taxableAmount * (ivaPercentage / 100)).toFixed(2),
+    );
+    const total = Number((taxableAmount + iva).toFixed(2));
+
+    const lastInvoice = await this.invoiceRepository.findOne({
+      where: {},
+      order: {
+        created_at: 'DESC',
+      },
+    });
+
+    let nextNumber = 1;
+
+    if (lastInvoice) {
+      const lastNumber = Number(
+        lastInvoice.invoice_number.replace('FAC-', ''),
+      );
+
+      if (!Number.isNaN(lastNumber)) {
+        nextNumber = lastNumber + 1;
+      }
+    }
+
+    const invoiceNumber = `FAC-${String(nextNumber).padStart(6, '0')}`;
+
+    const invoice = this.invoiceRepository.create({
+      invoice_number: invoiceNumber,
+      client_id: appointment.client_id,
+      appointment_id: appointment.id,
+      subtotal,
+      iva,
+      discount,
+      total,
+      status: body.status ?? 'Pendiente',
+    });
+
+    const savedInvoice = await this.invoiceRepository.save(invoice);
+
+    const invoiceDetails = appointment.details.map((detail) => {
+      const quantity = Number(detail.quantity);
+      const unitPrice = Number(detail.price);
+
+      return this.invoiceDetailRepository.create({
+        invoice_id: savedInvoice.id,
+        service_id: detail.service_id,
+        quantity,
+        unit_price: unitPrice,
+        subtotal: Number((unitPrice * quantity).toFixed(2)),
+      });
+    });
+
+    await this.invoiceDetailRepository.save(invoiceDetails);
+
+    return this.findOne(savedInvoice.id);
+  }
 
   async findAll() {
-    return await this.invoiceRepository.find({
+    return this.invoiceRepository.find({
       relations: {
         client: true,
-        appointment: true,
+        appointment: {
+          details: {
+            service: true,
+          },
+        },
+      },
+      order: {
+        created_at: 'DESC',
       },
     });
   }
 
   async findOne(id: string) {
     const invoice = await this.invoiceRepository.findOne({
-      where: { id },
+      where: {
+        id,
+      },
       relations: {
         client: true,
-        appointment: true,
+        appointment: {
+          details: {
+            service: true,
+          },
+        },
       },
     });
 
@@ -157,7 +188,7 @@ async create(body: any) {
 
     Object.assign(invoice, body);
 
-    return await this.invoiceRepository.save(invoice);
+    return this.invoiceRepository.save(invoice);
   }
 
   async remove(id: string) {
@@ -172,10 +203,16 @@ async create(body: any) {
 
   async generatePdf(id: string, res: Response) {
     const invoice = await this.invoiceRepository.findOne({
-      where: { id },
+      where: {
+        id,
+      },
       relations: {
         client: true,
-        appointment: true,
+        appointment: {
+          details: {
+            service: true,
+          },
+        },
       },
     });
 
@@ -197,9 +234,7 @@ async create(body: any) {
     });
 
     const setting = settings[0];
-
-    const businessName =
-      setting?.business_name ?? "Katty's Nails";
+    const businessName = setting?.business_name ?? "Katty's Nails";
 
     const doc = new PDFDocument({
       margin: 45,
@@ -214,10 +249,7 @@ async create(body: any) {
 
     doc.pipe(res);
 
-    // Encabezado con fondo
-    doc
-      .rect(0, 0, 595, 105)
-      .fill('#f8c8dc');
+    doc.rect(0, 0, 595, 105).fill('#f8c8dc');
 
     doc
       .fillColor('#7a2e4d')
@@ -243,15 +275,10 @@ async create(body: any) {
         { align: 'center' },
       );
 
-    doc
-      .text(
-        setting?.address ?? 'Quito, Ecuador',
-        45,
-        92,
-        { align: 'center' },
-      );
+    doc.text(setting?.address ?? 'Quito, Ecuador', 45, 92, {
+      align: 'center',
+    });
 
-    // Título factura
     doc
       .fillColor('#7a2e4d')
       .fontSize(20)
@@ -265,7 +292,6 @@ async create(body: any) {
       .strokeColor('#f0a6c1')
       .stroke();
 
-    // Información factura
     doc.fillColor('#000000').fontSize(11);
 
     doc.text(`Factura N°: ${invoice.invoice_number}`, 45, 180);
@@ -276,7 +302,6 @@ async create(body: any) {
     );
     doc.text(`Estado: ${invoice.status}`, 45, 216);
 
-    // Datos del cliente
     doc
       .fillColor('#7a2e4d')
       .fontSize(13)
@@ -288,16 +313,13 @@ async create(body: any) {
     doc.text(`Email: ${invoice.client?.email ?? 'N/A'}`, 330, 234);
     doc.text(`Dirección: ${invoice.client?.address ?? 'N/A'}`, 330, 250);
 
-    // Tabla
     const tableTop = 300;
     const itemX = 55;
     const qtyX = 290;
     const priceX = 365;
     const subtotalX = 455;
 
-    doc
-      .roundedRect(45, tableTop - 10, 505, 26, 6)
-      .fill('#7a2e4d');
+    doc.roundedRect(45, tableTop - 10, 505, 26, 6).fill('#7a2e4d');
 
     doc
       .fillColor('#ffffff')
@@ -329,7 +351,6 @@ async create(body: any) {
 
     y += 15;
 
-    // Totales
     const totalsX = 360;
 
     doc.fillColor('#000000').fontSize(11);
@@ -360,23 +381,15 @@ async create(body: any) {
 
     y += 25;
 
-    doc
-      .roundedRect(350, y - 8, 200, 30, 6)
-      .fill('#f8c8dc');
+    doc.roundedRect(350, y - 8, 200, 30, 6).fill('#f8c8dc');
 
     doc
       .fillColor('#7a2e4d')
       .fontSize(15)
-      .text(
-        `TOTAL: $${Number(invoice.total).toFixed(2)}`,
-        365,
-        y,
-        {
-          align: 'right',
-        },
-      );
+      .text(`TOTAL: $${Number(invoice.total).toFixed(2)}`, 365, y, {
+        align: 'right',
+      });
 
-    // Firma
     doc
       .strokeColor('#999999')
       .moveTo(70, 650)
@@ -388,7 +401,6 @@ async create(body: any) {
       .fontSize(10)
       .text('Firma responsable', 95, 660);
 
-    // Pie
     doc
       .fillColor('#7a2e4d')
       .fontSize(11)

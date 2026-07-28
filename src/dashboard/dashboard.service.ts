@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 
 import { Client } from '../clients/entities/client.entity';
 import { BeautyService } from '../services/entities/service.entity';
 import { Appointment } from '../appointments/entities/appointment.entity';
+import { AppointmentStatus } from '../appointments/enums/appointment-status.enum';
 import { Invoice } from '../invoices/entities/invoice.entity';
 
 @Injectable()
@@ -48,6 +49,8 @@ export class DashboardService {
       999,
     );
 
+    const todayString = this.formatDate(today);
+
     const [
       totalClients,
       totalServices,
@@ -65,16 +68,13 @@ export class DashboardService {
 
       this.appointmentRepository.count({
         where: {
-          status: 'Pendiente',
+          status: AppointmentStatus.PENDING,
         },
       }),
 
       this.appointmentRepository.count({
         where: {
-          appointment_date: Between(
-            startOfDay,
-            endOfDay,
-          ),
+          appointment_date: todayString,
         },
       }),
 
@@ -84,27 +84,38 @@ export class DashboardService {
     ]);
 
     const totalSales = invoices.reduce(
-      (sum, invoice) => sum + Number(invoice.total),
+      (sum, invoice) =>
+        sum + Number(invoice.total),
       0,
     );
 
     const salesToday = invoices
       .filter((invoice) => {
         const date = new Date(invoice.created_at);
-        return date >= startOfDay && date <= endOfDay;
+
+        return (
+          date >= startOfDay &&
+          date <= endOfDay
+        );
       })
       .reduce(
-        (sum, invoice) => sum + Number(invoice.total),
+        (sum, invoice) =>
+          sum + Number(invoice.total),
         0,
       );
 
     const salesMonth = invoices
       .filter((invoice) => {
         const date = new Date(invoice.created_at);
-        return date >= startOfMonth && date <= endOfMonth;
+
+        return (
+          date >= startOfMonth &&
+          date <= endOfMonth
+        );
       })
       .reduce(
-        (sum, invoice) => sum + Number(invoice.total),
+        (sum, invoice) =>
+          sum + Number(invoice.total),
         0,
       );
 
@@ -115,9 +126,29 @@ export class DashboardService {
       pendingAppointments,
       appointmentsToday,
       totalInvoices,
-      totalSales: Number(totalSales.toFixed(2)),
-      salesToday: Number(salesToday.toFixed(2)),
-      salesMonth: Number(salesMonth.toFixed(2)),
+      totalSales: Number(
+        totalSales.toFixed(2),
+      ),
+      salesToday: Number(
+        salesToday.toFixed(2),
+      ),
+      salesMonth: Number(
+        salesMonth.toFixed(2),
+      ),
     };
+  }
+
+  private formatDate(date: Date): string {
+    const year = date.getFullYear();
+
+    const month = String(
+      date.getMonth() + 1,
+    ).padStart(2, '0');
+
+    const day = String(
+      date.getDate(),
+    ).padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
   }
 }

@@ -1,35 +1,43 @@
+import { Type } from 'class-transformer';
 import {
+  ArrayMinSize,
   IsArray,
-  IsNotEmpty,
+  IsInt,
   IsOptional,
   IsString,
   IsUUID,
+  Min,
   ValidateNested,
 } from 'class-validator';
 
-import { Type } from 'class-transformer';
-
-export class CalculationServiceDto {
+export class CreateCalculationServiceDto {
   @IsUUID()
-  @IsNotEmpty()
   service_id: string;
 
-  @IsString()
   @IsOptional()
+  @IsString()
   group_name?: string;
+
+  @IsInt()
+  @Min(1)
+  quantity: number;
 }
 
 export class CreateCalculationDto {
-  @IsString()
+  @IsUUID()
+  client_id: string;
+
   @IsOptional()
+  @IsString()
   category_name?: string;
 
-  @IsString()
   @IsOptional()
+  @IsString()
   category_icon?: string;
 
   @IsArray()
+  @ArrayMinSize(1)
   @ValidateNested({ each: true })
-  @Type(() => CalculationServiceDto)
-  services: CalculationServiceDto[];
+  @Type(() => CreateCalculationServiceDto)
+  services: CreateCalculationServiceDto[];
 }

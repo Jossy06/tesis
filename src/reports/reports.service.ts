@@ -7,6 +7,18 @@ import { InvoiceDetail } from '../invoice-details/entities/invoice-detail.entity
 import { Client } from '../clients/entities/client.entity';
 import { Appointment } from '../appointments/entities/appointment.entity';
 
+interface TopServiceReport {
+  service: string;
+  timesSold: number;
+  income: number;
+}
+
+interface TopClientReport {
+  client: string;
+  appointments: number;
+  totalSpent: number;
+}
+
 @Injectable()
 export class ReportsService {
   constructor(
@@ -24,12 +36,14 @@ export class ReportsService {
   ) {}
 
   async getSalesReport() {
-    const invoices = await this.invoiceRepository.find();
+    const invoices =
+      await this.invoiceRepository.find();
 
     const totalInvoices = invoices.length;
 
     const totalSales = invoices.reduce(
-      (sum, invoice) => sum + Number(invoice.total),
+      (sum, invoice) =>
+        sum + Number(invoice.total),
       0,
     );
 
@@ -40,8 +54,12 @@ export class ReportsService {
 
     return {
       totalInvoices,
-      totalSales: Number(totalSales.toFixed(2)),
-      averageSale: Number(averageSale.toFixed(2)),
+      totalSales: Number(
+        totalSales.toFixed(2),
+      ),
+      averageSale: Number(
+        averageSale.toFixed(2),
+      ),
     };
   }
 
@@ -53,9 +71,16 @@ export class ReportsService {
         },
       });
 
-    const report = {};
+    const report: Record<
+      string,
+      TopServiceReport
+    > = {};
 
     details.forEach((detail) => {
+      if (!detail.service) {
+        return;
+      }
+
       const id = detail.service.id;
 
       if (!report[id]) {
@@ -66,14 +91,26 @@ export class ReportsService {
         };
       }
 
-      report[id].timesSold += detail.quantity;
-      report[id].income += Number(detail.subtotal);
+      report[id].timesSold += Number(
+        detail.quantity,
+      );
+
+      report[id].income += Number(
+        detail.subtotal,
+      );
     });
 
-    return Object.values(report).sort(
-      (a: any, b: any) =>
-        b.timesSold - a.timesSold,
-    );
+    return Object.values(report)
+      .map((item) => ({
+        ...item,
+        income: Number(
+          item.income.toFixed(2),
+        ),
+      }))
+      .sort(
+        (a, b) =>
+          b.timesSold - a.timesSold,
+      );
   }
 
   async getTopClients() {
@@ -84,40 +121,62 @@ export class ReportsService {
         },
       });
 
-    const report = {};
+    const report: Record<
+      string,
+      TopClientReport
+    > = {};
 
-    appointments.forEach((appointment) => {
-      const id = appointment.client.id;
+    appointments.forEach(
+      (appointment) => {
+        if (!appointment.client) {
+          return;
+        }
 
-      if (!report[id]) {
-        report[id] = {
-          client: appointment.client.name,
-          appointments: 0,
-          totalSpent: 0,
-        };
-      }
+        const id = appointment.client.id;
 
-      report[id].appointments++;
+        if (!report[id]) {
+          report[id] = {
+            client:
+              appointment.client.name,
+            appointments: 0,
+            totalSpent: 0,
+          };
+        }
 
-      report[id].totalSpent += Number(
-        appointment.final_price,
-      );
-    });
+        report[id].appointments += 1;
 
-    return Object.values(report).sort(
-      (a: any, b: any) =>
-        b.appointments - a.appointments,
+        report[id].totalSpent += Number(
+          appointment.total,
+        );
+      },
     );
+
+    return Object.values(report)
+      .map((item) => ({
+        ...item,
+        totalSpent: Number(
+          item.totalSpent.toFixed(2),
+        ),
+      }))
+      .sort(
+        (a, b) =>
+          b.totalSpent - a.totalSpent,
+      );
   }
 
   async getMonthlySales() {
     const invoices =
       await this.invoiceRepository.find();
 
-    const report = {};
+    const report: Record<
+      string,
+      number
+    > = {};
 
     invoices.forEach((invoice) => {
-      const date = new Date(invoice.created_at);
+      const date = new Date(
+        invoice.created_at,
+      );
 
       const month = `${date.getFullYear()}-${String(
         date.getMonth() + 1,
@@ -127,14 +186,18 @@ export class ReportsService {
         report[month] = 0;
       }
 
-      report[month] += Number(invoice.total);
+      report[month] += Number(
+        invoice.total,
+      );
     });
 
-    return Object.keys(report).map(
-      (month) => ({
+    return Object.keys(report)
+      .sort()
+      .map((month) => ({
         month,
-        total: Number(report[month].toFixed(2)),
-      }),
-    );
+        total: Number(
+          report[month].toFixed(2),
+        ),
+      }));
   }
 }
