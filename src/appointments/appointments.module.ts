@@ -1,14 +1,34 @@
-import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import {
+  Module,
+} from '@nestjs/common';
 
-import { Client } from '../clients/entities/client.entity';
-import { BeautyService } from '../services/entities/service.entity';
+import {
+  TypeOrmModule,
+} from '@nestjs/typeorm';
 
-import { Appointment } from './entities/appointment.entity';
-import { AppointmentDetail } from './entities/appointment-detail.entity';
+import {
+  Client,
+} from '../clients/entities/client.entity';
 
-import { AppointmentsController } from './appointments.controller';
-import { AppointmentsService } from './appointments.service';
+import {
+  ServiceCategory,
+} from '../service-categories/entities/service-category.entity';
+
+import {
+  Appointment,
+} from './entities/appointment.entity';
+
+import {
+  AppointmentDetail,
+} from './entities/appointment-detail.entity';
+
+import {
+  AppointmentsController,
+} from './appointments.controller';
+
+import {
+  AppointmentsService,
+} from './appointments.service';
 
 @Module({
   imports: [
@@ -16,11 +36,20 @@ import { AppointmentsService } from './appointments.service';
       Appointment,
       AppointmentDetail,
       Client,
-      BeautyService,
+      ServiceCategory,
     ]),
   ],
-  controllers: [AppointmentsController],
-  providers: [AppointmentsService],
-  exports: [AppointmentsService],
+
+  controllers: [
+    AppointmentsController,
+  ],
+
+  providers: [
+    AppointmentsService,
+  ],
+
+  exports: [
+    AppointmentsService,
+  ],
 })
 export class AppointmentsModule {}

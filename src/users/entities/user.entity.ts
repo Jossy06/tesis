@@ -1,9 +1,12 @@
 import {
-  Entity,
-  PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
+  Entity,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm';
+
+import { UserRole } from '../enums/user-role.enum';
 
 @Entity('users')
 export class User {
@@ -17,6 +20,7 @@ export class User {
 
   @Column({
     unique: true,
+    length: 150,
   })
   email: string;
 
@@ -24,10 +28,21 @@ export class User {
   password: string;
 
   @Column({
-    default: 'admin',
+    type: 'varchar',
+    length: 30,
+    default: UserRole.ADMIN,
   })
-  role: string;
+  role: UserRole;
+
+  @Column({
+    type: 'boolean',
+    default: true,
+  })
+  is_active: boolean;
 
   @CreateDateColumn()
   created_at: Date;
+
+  @UpdateDateColumn()
+  updated_at: Date;
 }

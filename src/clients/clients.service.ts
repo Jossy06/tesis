@@ -4,32 +4,53 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import {
+  InjectRepository,
+} from '@nestjs/typeorm';
 
-import { CreateClientDto } from './dto/create-client.dto';
-import { UpdateClientDto } from './dto/update-client.dto';
-import { Client } from './entities/client.entity';
+import {
+  Repository,
+} from 'typeorm';
+
+import {
+  Client,
+} from './entities/client.entity';
+
+import {
+  CreateClientDto,
+} from './dto/create-client.dto';
+
+import {
+  UpdateClientDto,
+} from './dto/update-client.dto';
 
 @Injectable()
 export class ClientsService {
   constructor(
     @InjectRepository(Client)
-    private readonly clientRepository: Repository<Client>,
+    private readonly clientRepository:
+      Repository<Client>,
   ) {}
 
   async create(
-    createClientDto: CreateClientDto,
+    dto: CreateClientDto,
+    userId: string,
   ): Promise<Client> {
-    if (createClientDto.email) {
-      const existingClient =
+    const email =
+      dto.email
+        ?.trim()
+        .toLowerCase() ||
+      null;
+
+    if (email) {
+      const existing =
         await this.clientRepository.findOne({
           where: {
-            email: createClientDto.email,
+            email,
           },
         });
 
-      if (existingClient) {
+      if (existing) {
         throw new ConflictException(
           'El correo ya está registrado',
         );
@@ -37,23 +58,53 @@ export class ClientsService {
     }
 
     const client =
-      this.clientRepository.create(createClientDto);
+      this.clientRepository.create({
+        name:
+          dto.name.trim(),
 
-    return this.clientRepository.save(client);
+        phone:
+          dto.phone.trim(),
+
+        email,
+
+        address:
+          dto.address?.trim() ||
+          null,
+
+        created_by_user_id:
+          userId,
+      });
+
+    return this.clientRepository.save(
+      client,
+    );
   }
 
-  async findAll(): Promise<Client[]> {
+  async findAll():
+    Promise<Client[]> {
     return this.clientRepository.find({
+      relations: {
+        created_by: true,
+      },
+
       order: {
         created_at: 'DESC',
       },
     });
   }
 
-  async findOne(id: string): Promise<Client> {
+  async findOne(
+    id: string,
+  ): Promise<Client> {
     const client =
       await this.clientRepository.findOne({
-        where: { id },
+        where: {
+          id,
+        },
+
+        relations: {
+          created_by: true,
+        },
       });
 
     if (!client) {
@@ -67,46 +118,86 @@ export class ClientsService {
 
   async update(
     id: string,
-    updateClientDto: UpdateClientDto,
+    dto: UpdateClientDto,
   ): Promise<Client> {
-    const client = await this.findOne(id);
+    const client =
+      await this.findOne(id);
 
     if (
-      updateClientDto.email &&
-      updateClientDto.email !== client.email
+      dto.email !== undefined
     ) {
-      const existingClient =
-        await this.clientRepository.findOne({
-          where: {
-            email: updateClientDto.email,
-          },
-        });
+      const email =
+        dto.email
+          ?.trim()
+          .toLowerCase() ||
+        null;
 
-      if (existingClient) {
-        throw new ConflictException(
-          'El correo ya está registrado',
-        );
+      if (
+        email &&
+        email !== client.email
+      ) {
+        const existing =
+          await this.clientRepository.findOne({
+            where: {
+              email,
+            },
+          });
+
+        if (
+          existing &&
+          existing.id !== id
+        ) {
+          throw new ConflictException(
+            'El correo ya está registrado',
+          );
+        }
       }
+
+      client.email = email;
     }
 
-    const updatedClient =
-      this.clientRepository.merge(
-        client,
-        updateClientDto,
-      );
+    if (
+      dto.name !== undefined
+    ) {
+      client.name =
+        dto.name.trim();
+    }
 
-    return this.clientRepository.save(updatedClient);
+    if (
+      dto.phone !== undefined
+    ) {
+      client.phone =
+        dto.phone.trim();
+    }
+
+    if (
+      dto.address !== undefined
+    ) {
+      client.address =
+        dto.address?.trim() ||
+        null;
+    }
+
+    return this.clientRepository.save(
+      client,
+    );
   }
 
   async remove(
     id: string,
-  ): Promise<{ message: string }> {
-    const client = await this.findOne(id);
+  ): Promise<{
+    message: string;
+  }> {
+    const client =
+      await this.findOne(id);
 
-    await this.clientRepository.remove(client);
+    await this.clientRepository.remove(
+      client,
+    );
 
     return {
-      message: 'Cliente eliminado correctamente',
+      message:
+        'Cliente eliminado correctamente',
     };
   }
 }

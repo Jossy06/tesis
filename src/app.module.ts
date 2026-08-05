@@ -1,22 +1,79 @@
-import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import {
+  Module,
+} from '@nestjs/common';
 
-import { UsersModule } from './users/users.module';
-import { AuthModule } from './auth/auth.module';
-import { ServicesModule } from './services/services.module';
-import { MaterialsModule } from './materials/materials.module';
-import { ServiceMaterialsModule } from './service-materials/service-materials.module';
-import { CalculationsModule } from './calculations/calculations.module';
-import { ClientsModule } from './clients/clients.module';
-import { AppointmentsModule } from './appointments/appointments.module';
-import { InvoicesModule } from './invoices/invoices.module';
-import { InvoiceDetailsModule } from './invoice-details/invoice-details.module';
-import { DashboardModule } from './dashboard/dashboard.module';
-import { ReportsModule } from './reports/reports.module';
-import { SettingsModule } from './settings/settings.module';
-import { ServiceCategoriesModule } from './service-categories/service-categories.module';
-import { ServiceGroupsModule } from './service-groups/service-groups.module';
+import {
+  ConfigModule,
+  ConfigService,
+} from '@nestjs/config';
+
+import {
+  TypeOrmModule,
+} from '@nestjs/typeorm';
+
+import {
+  UsersModule,
+} from './users/users.module';
+
+import {
+  AuthModule,
+} from './auth/auth.module';
+
+import {
+  ServicesModule,
+} from './services/services.module';
+
+import {
+  MaterialsModule,
+} from './materials/materials.module';
+
+import {
+  ServiceMaterialsModule,
+} from './service-materials/service-materials.module';
+
+import {
+  CalculationsModule,
+} from './calculations/calculations.module';
+
+import {
+  ClientsModule,
+} from './clients/clients.module';
+
+import {
+  AppointmentsModule,
+} from './appointments/appointments.module';
+
+import {
+  InvoicesModule,
+} from './invoices/invoices.module';
+
+import {
+  InvoiceDetailsModule,
+} from './invoice-details/invoice-details.module';
+
+import {
+  DashboardModule,
+} from './dashboard/dashboard.module';
+
+import {
+  ReportsModule,
+} from './reports/reports.module';
+
+import {
+  SettingsModule,
+} from './settings/settings.module';
+
+import {
+  ServiceCategoriesModule,
+} from './service-categories/service-categories.module';
+
+import {
+  ServiceGroupsModule,
+} from './service-groups/service-groups.module';
+
+import {
+  WorkerReportsModule,
+} from './worker-reports/worker-reports.module';
 
 @Module({
   imports: [
@@ -25,22 +82,60 @@ import { ServiceGroupsModule } from './service-groups/service-groups.module';
     }),
 
     TypeOrmModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        type: 'postgres',
+      imports: [
+        ConfigModule,
+      ],
 
-        host: config.get<string>('DB_HOST') || 'localhost',
-        port: Number(config.get<string>('DB_PORT') || 5432),
+      inject: [
+        ConfigService,
+      ],
 
-        username: config.get<string>('DB_USERNAME') || 'postgres',
-        password: config.get<string>('DB_PASSWORD') || '',
+      useFactory:
+        (
+          config:
+            ConfigService,
+        ) => ({
+          type:
+            'postgres',
 
-        database: config.get<string>('DB_DATABASE') || 'beauty_cost_system',
+          host:
+            config.get<string>(
+              'DB_HOST',
+            ) ||
+            'localhost',
 
-        autoLoadEntities: true,
-        synchronize: true,
-      }),
+          port:
+            Number(
+              config.get<string>(
+                'DB_PORT',
+              ) ||
+              5432,
+            ),
+
+          username:
+            config.get<string>(
+              'DB_USERNAME',
+            ) ||
+            'postgres',
+
+          password:
+            config.get<string>(
+              'DB_PASSWORD',
+            ) ||
+            '',
+
+          database:
+            config.get<string>(
+              'DB_DATABASE',
+            ) ||
+            'beauty_cost_system',
+
+          autoLoadEntities:
+            true,
+
+          synchronize:
+            true,
+        }),
     }),
 
     UsersModule,
@@ -58,6 +153,7 @@ import { ServiceGroupsModule } from './service-groups/service-groups.module';
     SettingsModule,
     ServiceCategoriesModule,
     ServiceGroupsModule,
+    WorkerReportsModule,
   ],
 })
 export class AppModule {}

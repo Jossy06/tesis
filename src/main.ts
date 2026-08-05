@@ -1,36 +1,44 @@
-import { ValidationPipe } from '@nestjs/common';
-import { NestFactory } from '@nestjs/core';
-import { ConfigService } from '@nestjs/config';
+import {
+  ValidationPipe,
+} from '@nestjs/common';
+
+import {
+  NestFactory,
+} from '@nestjs/core';
+
 import {
   DocumentBuilder,
   SwaggerModule,
 } from '@nestjs/swagger';
 
-import { AppModule } from './app.module';
+import {
+  AppModule,
+} from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-
-  const config = app.get(ConfigService);
-
-  console.log('========== CONFIG ==========');
-  console.log('DB_HOST:', config.get('DB_HOST'));
-  console.log('DB_PORT:', config.get('DB_PORT'));
-  console.log('DB_DATABASE:', config.get('DB_DATABASE'));
-  console.log('============================');
+  const app =
+    await NestFactory.create(
+      AppModule,
+    );
 
   app.enableCors({
-    origin: true,
-    credentials: true,
+    origin: [
+      'http://localhost:4200',
+      'http://192.168.100.47:4200',
+    ],
+
+    credentials:
+      true,
+
     methods: [
       'GET',
-      'HEAD',
+      'POST',
       'PUT',
       'PATCH',
-      'POST',
       'DELETE',
       'OPTIONS',
     ],
+
     allowedHeaders: [
       'Content-Type',
       'Authorization',
@@ -39,23 +47,36 @@ async function bootstrap() {
 
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
+      whitelist:
+        true,
+
+      transform:
+        true,
+
+      forbidNonWhitelisted:
+        true,
     }),
   );
 
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('Beauty Cost System API')
-    .setDescription("API del sistema Katty's Nails")
-    .setVersion('1.0')
-    .addBearerAuth()
-    .build();
+  const swaggerConfig =
+    new DocumentBuilder()
+      .setTitle(
+        "Kathy's Nails API",
+      )
+      .setDescription(
+        'API del sistema de costos y gestión del salón',
+      )
+      .setVersion(
+        '1.0',
+      )
+      .addBearerAuth()
+      .build();
 
-  const document = SwaggerModule.createDocument(
-    app,
-    swaggerConfig,
-  );
+  const document =
+    SwaggerModule.createDocument(
+      app,
+      swaggerConfig,
+    );
 
   SwaggerModule.setup(
     'api',
@@ -63,15 +84,30 @@ async function bootstrap() {
     document,
   );
 
-  await app.listen(3000);
-
-  console.log(
-    '🚀 Backend corriendo en http://localhost:3000',
+  await app.listen(
+    3000,
+    '0.0.0.0',
   );
 
   console.log(
-    '📘 Swagger disponible en http://localhost:3000/api',
+    'Backend disponible en:',
+  );
+
+  console.log(
+    'http://localhost:3000',
+  );
+
+  console.log(
+    'http://192.168.100.47:3000',
+  );
+
+  console.log(
+    'Swagger:',
+  );
+
+  console.log(
+    'http://192.168.100.47:3000/api',
   );
 }
 
-bootstrap();
+void bootstrap();

@@ -1,30 +1,52 @@
 import {
-  Controller,
-  Get,
-  Post,
   Body,
-  Patch,
-  Param,
+  Controller,
   Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Req,
   Res,
+  UseGuards,
 } from '@nestjs/common';
 
-import { InvoicesService } from './invoices.service';
-import { CreateInvoiceDto } from './dto/create-invoice.dto';
-import { UpdateInvoiceDto } from './dto/update-invoice.dto';
+import {
+  JwtAuthGuard,
+} from '../auth/guards/jwt-auth.guard';
 
+import {
+  InvoicesService,
+} from './invoices.service';
+
+import {
+  CreateInvoiceDto,
+} from './dto/create-invoice.dto';
+
+import {
+  UpdateInvoiceDto,
+} from './dto/update-invoice.dto';
+
+@UseGuards(JwtAuthGuard)
 @Controller('invoices')
 export class InvoicesController {
   constructor(
-    private readonly invoicesService: InvoicesService,
+    private readonly invoicesService:
+      InvoicesService,
   ) {}
 
   @Post()
   create(
-    @Body() createInvoiceDto: CreateInvoiceDto,
+    @Body()
+    createInvoiceDto:
+      CreateInvoiceDto,
+
+    @Req()
+    req: any,
   ) {
     return this.invoicesService.create(
       createInvoiceDto,
+      req.user.id,
     );
   }
 
@@ -35,15 +57,21 @@ export class InvoicesController {
 
   @Get(':id')
   findOne(
-    @Param('id') id: string,
+    @Param('id')
+    id: string,
   ) {
-    return this.invoicesService.findOne(id);
+    return this.invoicesService.findOne(
+      id,
+    );
   }
 
   @Get(':id/pdf')
-  async generatePdf(
-    @Param('id') id: string,
-    @Res() res: any,
+  generatePdf(
+    @Param('id')
+    id: string,
+
+    @Res()
+    res: any,
   ) {
     return this.invoicesService.generatePdf(
       id,
@@ -53,8 +81,12 @@ export class InvoicesController {
 
   @Patch(':id')
   update(
-    @Param('id') id: string,
-    @Body() updateInvoiceDto: UpdateInvoiceDto,
+    @Param('id')
+    id: string,
+
+    @Body()
+    updateInvoiceDto:
+      UpdateInvoiceDto,
   ) {
     return this.invoicesService.update(
       id,
@@ -64,8 +96,11 @@ export class InvoicesController {
 
   @Delete(':id')
   remove(
-    @Param('id') id: string,
+    @Param('id')
+    id: string,
   ) {
-    return this.invoicesService.remove(id);
+    return this.invoicesService.remove(
+      id,
+    );
   }
 }

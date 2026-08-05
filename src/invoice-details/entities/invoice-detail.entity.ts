@@ -1,9 +1,9 @@
 import {
-  Entity,
-  PrimaryGeneratedColumn,
   Column,
-  ManyToOne,
+  Entity,
   JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
 } from 'typeorm';
 
 import { Invoice } from '../../invoices/entities/invoice.entity';
@@ -17,15 +17,31 @@ export class InvoiceDetail {
   @Column('uuid')
   invoice_id: string;
 
-  @ManyToOne(() => Invoice)
-  @JoinColumn({ name: 'invoice_id' })
+  @ManyToOne(
+    () => Invoice,
+    {
+      nullable: false,
+      onDelete: 'CASCADE',
+    },
+  )
+  @JoinColumn({
+    name: 'invoice_id',
+  })
   invoice: Invoice;
 
   @Column('uuid')
   service_id: string;
 
-  @ManyToOne(() => BeautyService)
-  @JoinColumn({ name: 'service_id' })
+  @ManyToOne(
+    () => BeautyService,
+    {
+      nullable: false,
+      onDelete: 'RESTRICT',
+    },
+  )
+  @JoinColumn({
+    name: 'service_id',
+  })
   service: BeautyService;
 
   @Column('int')

@@ -30,7 +30,7 @@ export class InvoicesService {
     private readonly settingRepository: Repository<Setting>,
   ) {}
 
-  async create(body: any) {
+  async create(body: any, userId: string) {
     const appointment = await this.appointmentRepository.findOne({
       where: {
         id: body.appointment_id,
@@ -93,30 +93,13 @@ export class InvoicesService {
     );
     const total = Number((taxableAmount + iva).toFixed(2));
 
-    const lastInvoice = await this.invoiceRepository.findOne({
-      where: {},
-      order: {
-        created_at: 'DESC',
-      },
-    });
-
-    let nextNumber = 1;
-
-    if (lastInvoice) {
-      const lastNumber = Number(
-        lastInvoice.invoice_number.replace('FAC-', ''),
-      );
-
-      if (!Number.isNaN(lastNumber)) {
-        nextNumber = lastNumber + 1;
-      }
-    }
-
-    const invoiceNumber = `FAC-${String(nextNumber).padStart(6, '0')}`;
+    const invoiceNumber =
+      await this.generateInvoiceNumber();
 
     const invoice = this.invoiceRepository.create({
       invoice_number: invoiceNumber,
       client_id: appointment.client_id,
+      created_by_user_id: userId,
       appointment_id: appointment.id,
       subtotal,
       iva,
@@ -149,6 +132,7 @@ export class InvoicesService {
     return this.invoiceRepository.find({
       relations: {
         client: true,
+        created_by: true,
         appointment: {
           details: {
             service: true,
@@ -168,6 +152,7 @@ export class InvoicesService {
       },
       relations: {
         client: true,
+        created_by: true,
         appointment: {
           details: {
             service: true,
@@ -191,15 +176,33 @@ export class InvoicesService {
     return this.invoiceRepository.save(invoice);
   }
 
-  async remove(id: string) {
-    const invoice = await this.findOne(id);
+  async remove(
+    id: string,
+  ): Promise<{ message: string }> {
+    const invoice =
+      await this.invoiceRepository.findOne({
+        where: { id },
+      });
 
-    await this.invoiceRepository.remove(invoice);
+    if (!invoice) {
+      throw new NotFoundException(
+        'Factura no encontrada',
+      );
+    }
+
+    await this.invoiceDetailRepository.delete({
+      invoice_id: invoice.id,
+    });
+
+    await this.invoiceRepository.delete(
+      invoice.id,
+    );
 
     return {
       message: 'Factura eliminada correctamente',
     };
   }
+
 
   async generatePdf(id: string, res: Response) {
     const invoice = await this.invoiceRepository.findOne({
@@ -208,6 +211,7 @@ export class InvoicesService {
       },
       relations: {
         client: true,
+        created_by: true,
         appointment: {
           details: {
             service: true,
@@ -229,16 +233,44 @@ export class InvoicesService {
       },
     });
 
-    const settings = await this.settingRepository.find({
-      take: 1,
+    const setting = await this.settingRepository.findOne({
+      where: {},
+      order: {
+        created_at: 'ASC',
+      },
     });
 
-    const setting = settings[0];
-    const businessName = setting?.business_name ?? "Katty's Nails";
+    const businessName =
+      setting?.business_name ?? "Kathy's Nails";
+
+    const businessPhone =
+      setting?.phone ?? 'N/A';
+
+    const businessEmail =
+      setting?.email ?? 'N/A';
+
+    const businessAddress =
+      setting?.address ?? 'Quito, Ecuador';
+
+    const businessRuc =
+      setting?.ruc ?? 'N/A';
+
+    const ivaPercentage =
+      Number(setting?.iva_percentage ?? 15);
+
+    const terms =
+      setting?.terms_conditions?.trim() ||
+      [
+        'Los servicios serán realizados por profesionales capacitados.',
+        'Cualquier cambio o cancelación debe realizarse con al menos 24 horas de anticipación.',
+        'El cliente debe informar sobre alergias o condiciones médicas relevantes.',
+        'El salón no se responsabiliza por reacciones derivadas de información no proporcionada.',
+      ].join('\n');
 
     const doc = new PDFDocument({
-      margin: 45,
+      margin: 0,
       size: 'A4',
+      bufferPages: true,
     });
 
     res.setHeader('Content-Type', 'application/pdf');
@@ -249,172 +281,559 @@ export class InvoicesService {
 
     doc.pipe(res);
 
-    doc.rect(0, 0, 595, 105).fill('#f8c8dc');
+    const pageWidth = 595.28;
+    const pageHeight = 841.89;
 
-    doc
-      .fillColor('#7a2e4d')
-      .fontSize(26)
-      .text(businessName, 45, 25, {
-        align: 'center',
-      });
+    const marginX = 44;
+    const contentWidth = pageWidth - marginX * 2;
 
-    doc
-      .fontSize(11)
-      .fillColor('#5c5c5c')
-      .text('Centro de Belleza', 45, 58, {
-        align: 'center',
-      });
+    const colors = {
+      text: '#2f2b2d',
+      muted: '#6f676b',
+      pink: '#fbe7e7',
+      pinkStrong: '#e8b9c7',
+      line: '#f0d5dc',
+      white: '#ffffff',
+    };
 
-    doc
-      .fontSize(9)
-      .fillColor('#333333')
-      .text(
-        `RUC: ${setting?.ruc ?? 'N/A'} | Tel: ${setting?.phone ?? 'N/A'} | ${setting?.email ?? 'N/A'}`,
-        45,
-        78,
-        { align: 'center' },
+    const money = (value: number | string) =>
+      new Intl.NumberFormat('es-EC', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 2,
+      }).format(Number(value ?? 0));
+
+    const dateText = new Intl.DateTimeFormat('es-EC', {
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+    }).format(new Date(invoice.created_at));
+
+    const drawPageBackground = () => {
+      doc
+        .rect(0, 0, pageWidth, pageHeight)
+        .fill(colors.white);
+    };
+
+    const drawHeader = () => {
+      drawPageBackground();
+
+      doc
+        .fillColor(colors.text)
+        .font('Helvetica')
+        .fontSize(40)
+        .text('F A C T U R A', marginX, 46, {
+          width: 355,
+          characterSpacing: 2,
+        });
+
+      doc
+        .fillColor(colors.pink)
+        .fontSize(88)
+        .text('K', pageWidth - 115, 20, {
+          width: 70,
+          align: 'center',
+        });
+
+      doc
+        .fillColor(colors.text)
+        .font('Helvetica-Bold')
+        .fontSize(12)
+        .text(
+          businessName.toUpperCase(),
+          pageWidth - 190,
+          42,
+          {
+            width: 140,
+            align: 'right',
+          },
+        );
+
+      doc
+        .font('Helvetica')
+        .fontSize(8.5)
+        .fillColor(colors.muted)
+        .text(
+          `RUC: ${businessRuc}
+${businessPhone}
+${businessAddress}
+${businessEmail}`,
+          pageWidth - 215,
+          64,
+          {
+            width: 165,
+            align: 'right',
+            lineGap: 2,
+          },
+        );
+
+      doc
+        .rect(marginX, 118, 178, 24)
+        .fill(colors.pink);
+
+      doc
+        .fillColor(colors.text)
+        .font('Helvetica')
+        .fontSize(8.5)
+        .text(
+          `NÚMERO DE FACTURA ${invoice.invoice_number}`,
+          marginX + 10,
+          126,
+          {
+            width: 160,
+          },
+        );
+
+      doc
+        .rect(marginX + 188, 118, 180, 24)
+        .fill(colors.pink);
+
+      doc
+        .fillColor(colors.text)
+        .fontSize(8.5)
+        .text(
+          dateText.toUpperCase(),
+          marginX + 198,
+          126,
+          {
+            width: 160,
+          },
+        );
+    };
+
+    const drawClientSection = () => {
+      doc
+        .fillColor(colors.text)
+        .font('Helvetica-Bold')
+        .fontSize(16)
+        .text('CLIENTE:', marginX, 190);
+
+      doc
+        .font('Helvetica')
+        .fontSize(11)
+        .fillColor(colors.text)
+        .text(
+          invoice.client?.name ?? 'N/A',
+          marginX,
+          218,
+        );
+
+      doc
+        .fillColor(colors.muted)
+        .text(
+          invoice.client?.email ?? 'Sin correo',
+          marginX,
+          236,
+        );
+
+      doc.text(
+        invoice.client?.phone ?? 'Sin teléfono',
+        marginX,
+        254,
       );
 
-    doc.text(setting?.address ?? 'Quito, Ecuador', 45, 92, {
-      align: 'center',
-    });
+      if (invoice.client?.address) {
+        doc.text(
+          invoice.client.address,
+          marginX,
+          272,
+          {
+            width: 280,
+          },
+        );
+      }
+    };
 
-    doc
-      .fillColor('#7a2e4d')
-      .fontSize(20)
-      .text('FACTURA', 45, 130, {
-        align: 'center',
-      });
-
-    doc
-      .moveTo(45, 160)
-      .lineTo(550, 160)
-      .strokeColor('#f0a6c1')
-      .stroke();
-
-    doc.fillColor('#000000').fontSize(11);
-
-    doc.text(`Factura N°: ${invoice.invoice_number}`, 45, 180);
-    doc.text(
-      `Fecha: ${new Date(invoice.created_at).toLocaleDateString()}`,
-      45,
-      198,
-    );
-    doc.text(`Estado: ${invoice.status}`, 45, 216);
-
-    doc
-      .fillColor('#7a2e4d')
-      .fontSize(13)
-      .text('Datos del cliente', 330, 180);
-
-    doc.fillColor('#000000').fontSize(10);
-    doc.text(`Cliente: ${invoice.client?.name ?? 'N/A'}`, 330, 202);
-    doc.text(`Teléfono: ${invoice.client?.phone ?? 'N/A'}`, 330, 218);
-    doc.text(`Email: ${invoice.client?.email ?? 'N/A'}`, 330, 234);
-    doc.text(`Dirección: ${invoice.client?.address ?? 'N/A'}`, 330, 250);
-
-    const tableTop = 300;
-    const itemX = 55;
-    const qtyX = 290;
-    const priceX = 365;
-    const subtotalX = 455;
-
-    doc.roundedRect(45, tableTop - 10, 505, 26, 6).fill('#7a2e4d');
-
-    doc
-      .fillColor('#ffffff')
-      .fontSize(10)
-      .text('Servicio', itemX, tableTop)
-      .text('Cant.', qtyX, tableTop)
-      .text('Precio', priceX, tableTop)
-      .text('Subtotal', subtotalX, tableTop);
-
-    let y = tableTop + 35;
-
-    details.forEach((detail) => {
+    const drawTableHeader = (y: number) => {
       doc
-        .fillColor('#000000')
-        .fontSize(10)
-        .text(detail.service?.name ?? 'Servicio', itemX, y)
-        .text(String(detail.quantity), qtyX, y)
-        .text(`$${Number(detail.unit_price).toFixed(2)}`, priceX, y)
-        .text(`$${Number(detail.subtotal).toFixed(2)}`, subtotalX, y);
+        .rect(marginX, y, contentWidth, 34)
+        .fill(colors.pink);
 
       doc
-        .moveTo(45, y + 18)
-        .lineTo(550, y + 18)
-        .strokeColor('#e6e6e6')
+        .fillColor(colors.text)
+        .font('Helvetica-Bold')
+        .fontSize(9)
+        .text(
+          'DESCRIPCIÓN DE LOS SERVICIOS',
+          marginX + 22,
+          y + 12,
+          {
+            width: 270,
+          },
+        )
+        .text(
+          'CANTIDAD',
+          marginX + 330,
+          y + 12,
+          {
+            width: 75,
+            align: 'center',
+          },
+        )
+        .text(
+          'PRECIO',
+          marginX + 420,
+          y + 12,
+          {
+            width: 70,
+            align: 'right',
+          },
+        );
+    };
+
+    const drawTotals = (startY: number) => {
+      const boxWidth = 215;
+      const boxX =
+        pageWidth - marginX - boxWidth;
+      const boxHeight =
+        Number(invoice.discount) > 0
+          ? 112
+          : 92;
+
+      doc
+        .rect(
+          boxX,
+          startY,
+          boxWidth,
+          boxHeight,
+        )
+        .lineWidth(1)
+        .strokeColor(colors.line)
         .stroke();
 
-      y += 28;
-    });
+      const labelX = boxX + 18;
+      const valueX = boxX + 120;
 
-    y += 15;
+      doc
+        .font('Helvetica')
+        .fontSize(10)
+        .fillColor(colors.text)
+        .text(
+          'Subtotal:',
+          labelX,
+          startY + 15,
+          {
+            width: 90,
+            align: 'right',
+          },
+        )
+        .text(
+          money(invoice.subtotal),
+          valueX,
+          startY + 15,
+          {
+            width: 76,
+            align: 'right',
+          },
+        );
 
-    const totalsX = 360;
+      let lineY = startY + 37;
 
-    doc.fillColor('#000000').fontSize(11);
-    doc.text(
-      `Subtotal: $${Number(invoice.subtotal).toFixed(2)}`,
-      totalsX,
-      y,
-      { align: 'right' },
+      if (Number(invoice.discount) > 0) {
+        doc
+          .text(
+            'Descuento:',
+            labelX,
+            lineY,
+            {
+              width: 90,
+              align: 'right',
+            },
+          )
+          .text(
+            `- ${money(invoice.discount)}`,
+            valueX,
+            lineY,
+            {
+              width: 76,
+              align: 'right',
+            },
+          );
+
+        lineY += 22;
+      }
+
+      doc
+        .text(
+          `IVA ${ivaPercentage}%:`,
+          labelX,
+          lineY,
+          {
+            width: 90,
+            align: 'right',
+          },
+        )
+        .text(
+          money(invoice.iva),
+          valueX,
+          lineY,
+          {
+            width: 76,
+            align: 'right',
+          },
+        );
+
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(13)
+        .text(
+          'TOTAL:',
+          labelX,
+          lineY + 28,
+          {
+            width: 90,
+            align: 'right',
+          },
+        )
+        .text(
+          money(invoice.total),
+          valueX,
+          lineY + 28,
+          {
+            width: 76,
+            align: 'right',
+          },
+        );
+
+      return startY + boxHeight;
+    };
+
+    const drawTerms = (startY: number) => {
+      const boxY = Math.max(startY, 690);
+      const boxHeight =
+        pageHeight - boxY - 36;
+
+      doc
+        .rect(
+          marginX,
+          boxY,
+          contentWidth,
+          boxHeight,
+        )
+        .fill(colors.pink);
+
+      doc
+        .fillColor(colors.text)
+        .font('Helvetica-Bold')
+        .fontSize(10)
+        .text(
+          'TÉRMINOS Y CONDICIONES:',
+          marginX + 22,
+          boxY + 18,
+          {
+            width: contentWidth - 44,
+          },
+        );
+
+      const formattedTerms = terms
+        .split('\n')
+        .map((line) => {
+          const cleanLine = line.trim();
+
+          if (!cleanLine) {
+            return '';
+          }
+
+          return cleanLine.startsWith('-')
+            ? cleanLine
+            : `- ${cleanLine}`;
+        })
+        .filter(Boolean)
+        .join('\n');
+
+      doc
+        .font('Helvetica')
+        .fontSize(8.5)
+        .fillColor(colors.text)
+        .text(
+          formattedTerms,
+          marginX + 22,
+          boxY + 42,
+          {
+            width: contentWidth - 44,
+            lineGap: 3,
+          },
+        );
+    };
+
+    drawHeader();
+    drawClientSection();
+
+    let tableY = 320;
+    drawTableHeader(tableY);
+
+    let rowY = tableY + 44;
+
+    if (details.length === 0) {
+      doc
+        .fillColor(colors.muted)
+        .font('Helvetica')
+        .fontSize(10)
+        .text(
+          'No existen servicios registrados.',
+          marginX + 22,
+          rowY,
+          {
+            width: contentWidth - 44,
+          },
+        );
+
+      rowY += 30;
+    } else {
+      for (const detail of details) {
+        const serviceName =
+          detail.service?.name ??
+          'Servicio';
+
+        const quantity =
+          Number(detail.quantity ?? 0);
+
+        const unitPrice =
+          Number(detail.unit_price ?? 0);
+
+        const rowHeight = Math.max(
+          30,
+          doc.heightOfString(
+            serviceName,
+            {
+              width: 285,
+            },
+          ) + 16,
+        );
+
+        if (rowY + rowHeight > 630) {
+          doc.addPage();
+          drawHeader();
+
+          tableY = 170;
+          drawTableHeader(tableY);
+          rowY = tableY + 44;
+        }
+
+        doc
+          .fillColor(colors.text)
+          .font('Helvetica')
+          .fontSize(9.5)
+          .text(
+            serviceName,
+            marginX + 22,
+            rowY,
+            {
+              width: 285,
+            },
+          )
+          .text(
+            String(quantity),
+            marginX + 330,
+            rowY,
+            {
+              width: 75,
+              align: 'center',
+            },
+          )
+          .text(
+            money(unitPrice),
+            marginX + 420,
+            rowY,
+            {
+              width: 70,
+              align: 'right',
+            },
+          );
+
+        doc
+          .moveTo(
+            marginX + 5,
+            rowY + rowHeight - 6,
+          )
+          .lineTo(
+            marginX + contentWidth,
+            rowY + rowHeight - 6,
+          )
+          .lineWidth(0.7)
+          .strokeColor(colors.line)
+          .stroke();
+
+        rowY += rowHeight;
+      }
+    }
+
+    const totalsEndY = drawTotals(
+      rowY + 14,
     );
 
-    y += 20;
-
-    doc.text(
-      `Descuento: $${Number(invoice.discount).toFixed(2)}`,
-      totalsX,
-      y,
-      { align: 'right' },
+    drawTerms(
+      totalsEndY + 30,
     );
-
-    y += 20;
-
-    doc.text(
-      `IVA: $${Number(invoice.iva).toFixed(2)}`,
-      totalsX,
-      y,
-      { align: 'right' },
-    );
-
-    y += 25;
-
-    doc.roundedRect(350, y - 8, 200, 30, 6).fill('#f8c8dc');
-
-    doc
-      .fillColor('#7a2e4d')
-      .fontSize(15)
-      .text(`TOTAL: $${Number(invoice.total).toFixed(2)}`, 365, y, {
-        align: 'right',
-      });
-
-    doc
-      .strokeColor('#999999')
-      .moveTo(70, 650)
-      .lineTo(230, 650)
-      .stroke();
-
-    doc
-      .fillColor('#555555')
-      .fontSize(10)
-      .text('Firma responsable', 95, 660);
-
-    doc
-      .fillColor('#7a2e4d')
-      .fontSize(11)
-      .text('¡Gracias por confiar en Katty’s Nails!', 45, 720, {
-        align: 'center',
-      });
-
-    doc
-      .fillColor('#777777')
-      .fontSize(9)
-      .text('Belleza en tus manos', 45, 738, {
-        align: 'center',
-      });
 
     doc.end();
   }
+
+  /**
+   * Genera números como FAC-20260804-001.
+   * El consecutivo vuelve a 001 cada día.
+   */
+  private async generateInvoiceNumber(): Promise<string> {
+    const now = new Date();
+
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+
+    const datePart = `${year}${month}${day}`;
+    const prefix = `FAC-${datePart}-`;
+
+    const existingInvoices =
+      await this.invoiceRepository
+        .createQueryBuilder('invoice')
+        .select(
+          'invoice.invoice_number',
+          'invoice_number',
+        )
+        .where(
+          'invoice.invoice_number LIKE :prefix',
+          {
+            prefix: `${prefix}%`,
+          },
+        )
+        .getRawMany<{
+          invoice_number: string;
+        }>();
+
+    const pattern = new RegExp(
+      `^FAC-${datePart}-(\\d{3,})$`,
+    );
+
+    let highestSequence = 0;
+
+    for (const item of existingInvoices) {
+      const match = item.invoice_number.match(pattern);
+
+      if (!match) {
+        continue;
+      }
+
+      const sequence = Number(match[1]);
+
+      if (
+        !Number.isNaN(sequence) &&
+        sequence > highestSequence
+      ) {
+        highestSequence = sequence;
+      }
+    }
+
+    const nextSequence = highestSequence + 1;
+
+    const invoiceNumber =
+      `${prefix}${String(nextSequence).padStart(3, '0')}`;
+
+    console.log(
+      'Número de factura generado:',
+      invoiceNumber,
+    );
+
+    return invoiceNumber;
+  }
+
 }

@@ -14,13 +14,19 @@ import { UpdateSettingDto } from './dto/update-setting.dto';
 export class SettingsService {
   constructor(
     @InjectRepository(Setting)
-    private readonly settingRepository: Repository<Setting>,
+    private readonly settingRepository:
+      Repository<Setting>,
   ) {}
 
-  async create(createSettingDto: CreateSettingDto) {
+  async create(
+    createSettingDto: CreateSettingDto,
+  ): Promise<Setting> {
     const existingSetting =
       await this.settingRepository.findOne({
         where: {},
+        order: {
+          created_at: 'ASC',
+        },
       });
 
     if (existingSetting) {
@@ -29,7 +35,7 @@ export class SettingsService {
         createSettingDto,
       );
 
-      return await this.settingRepository.save(
+      return this.settingRepository.save(
         existingSetting,
       );
     }
@@ -39,19 +45,36 @@ export class SettingsService {
         createSettingDto,
       );
 
-    return await this.settingRepository.save(
+    return this.settingRepository.save(
       setting,
     );
   }
 
-  async findAll() {
-    return await this.settingRepository.find();
+  async findAll(): Promise<Setting[]> {
+    return this.settingRepository.find({
+      order: {
+        created_at: 'ASC',
+      },
+    });
   }
 
-  async findOne(id: string) {
+  async findCurrent(): Promise<Setting | null> {
+    return this.settingRepository.findOne({
+      where: {},
+      order: {
+        created_at: 'ASC',
+      },
+    });
+  }
+
+  async findOne(
+    id: string,
+  ): Promise<Setting> {
     const setting =
       await this.settingRepository.findOne({
-        where: { id },
+        where: {
+          id,
+        },
       });
 
     if (!setting) {
@@ -66,7 +89,7 @@ export class SettingsService {
   async update(
     id: string,
     updateSettingDto: UpdateSettingDto,
-  ) {
+  ): Promise<Setting> {
     const setting =
       await this.findOne(id);
 
@@ -75,12 +98,14 @@ export class SettingsService {
       updateSettingDto,
     );
 
-    return await this.settingRepository.save(
+    return this.settingRepository.save(
       setting,
     );
   }
 
-  async remove(id: string) {
+  async remove(
+    id: string,
+  ): Promise<{ message: string }> {
     const setting =
       await this.findOne(id);
 

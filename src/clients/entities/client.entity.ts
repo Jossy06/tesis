@@ -2,10 +2,13 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  JoinColumn,
+  ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-
 import { ApiProperty } from '@nestjs/swagger';
+
+import { User } from '../../users/entities/user.entity';
 
 @Entity('clients')
 export class Client {
@@ -15,22 +18,12 @@ export class Client {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @ApiProperty({
-    example: 'María Pérez',
-  })
-  @Column({
-    type: 'varchar',
-    length: 100,
-  })
+  @ApiProperty({ example: 'María Pérez' })
+  @Column({ type: 'varchar', length: 100 })
   name: string;
 
-  @ApiProperty({
-    example: '0999999999',
-  })
-  @Column({
-    type: 'varchar',
-    length: 15,
-  })
+  @ApiProperty({ example: '0999999999' })
+  @Column({ type: 'varchar', length: 15 })
   phone: string;
 
   @ApiProperty({
@@ -39,6 +32,7 @@ export class Client {
   })
   @Column({
     type: 'varchar',
+    length: 150,
     unique: true,
     nullable: true,
   })
@@ -53,6 +47,21 @@ export class Client {
     nullable: true,
   })
   address: string | null;
+
+  @Column({
+    type: 'uuid',
+    nullable: true,
+  })
+  created_by_user_id: string | null;
+
+  @ManyToOne(() => User, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({
+    name: 'created_by_user_id',
+  })
+  created_by: User | null;
 
   @ApiProperty()
   @CreateDateColumn({

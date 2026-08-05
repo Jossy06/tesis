@@ -1,14 +1,38 @@
-import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import {
+  Module,
+} from '@nestjs/common';
 
-import { InvoicesService } from './invoices.service';
-import { InvoicesController } from './invoices.controller';
+import {
+  TypeOrmModule,
+} from '@nestjs/typeorm';
 
-import { Invoice } from './entities/invoice.entity';
-import { InvoiceDetail } from '../invoice-details/entities/invoice-detail.entity';
-import { Client } from '../clients/entities/client.entity';
-import { Appointment } from '../appointments/entities/appointment.entity';
-import { Setting } from '../settings/entities/setting.entity';
+import {
+  InvoicesService,
+} from './invoices.service';
+
+import {
+  InvoicesController,
+} from './invoices.controller';
+
+import {
+  Invoice,
+} from './entities/invoice.entity';
+
+import {
+  InvoiceDetail,
+} from '../invoice-details/entities/invoice-detail.entity';
+
+import {
+  Client,
+} from '../clients/entities/client.entity';
+
+import {
+  Appointment,
+} from '../appointments/entities/appointment.entity';
+
+import {
+  Setting,
+} from '../settings/entities/setting.entity';
 
 @Module({
   imports: [
@@ -20,7 +44,17 @@ import { Setting } from '../settings/entities/setting.entity';
       Setting,
     ]),
   ],
-  controllers: [InvoicesController],
-  providers: [InvoicesService],
+
+  controllers: [
+    InvoicesController,
+  ],
+
+  providers: [
+    InvoicesService,
+  ],
+
+  exports: [
+    InvoicesService,
+  ],
 })
 export class InvoicesModule {}

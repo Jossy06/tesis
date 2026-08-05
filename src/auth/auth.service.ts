@@ -1,7 +1,7 @@
 import {
+  ConflictException,
   Injectable,
   UnauthorizedException,
-  ConflictException,
 } from '@nestjs/common';
 
 import { JwtService } from '@nestjs/jwt';
@@ -15,91 +15,92 @@ import { RegisterDto } from './dto/register.dto';
 @Injectable()
 export class AuthService {
   constructor(
-    private readonly usersService: UsersService,
-    private readonly jwtService: JwtService,
+    private readonly usersService:
+      UsersService,
+
+    private readonly jwtService:
+      JwtService,
   ) {}
 
- async register(registerDto: RegisterDto) {
-  const existingUser =
-    await this.usersService.findByEmail(
-      registerDto.email,
-    );
+  async register(
+    registerDto: RegisterDto,
+  ) {
+    const existingUser =
+      await this.usersService
+        .findByEmail(
+          registerDto.email,
+        );
 
-  if (existingUser) {
-    throw new ConflictException(
-      'El correo ya está registrado',
-    );
+    if (existingUser) {
+      throw new ConflictException(
+        'El correo ya está registrado',
+      );
+    }
+
+    const user =
+      await this.usersService
+        .create(registerDto);
+
+    return {
+      message:
+        'Usuario registrado correctamente',
+
+      user,
+    };
   }
 
-  const user =
-    await this.usersService.create(registerDto);
+  async login(
+    loginDto: LoginDto,
+  ) {
+    const user =
+      await this.usersService
+        .findByEmail(
+          loginDto.email,
+        );
 
-  const payload = {
-    sub: user.id,
-    email: user.email,
-    role: user.role,
-  };
+    if (!user) {
+      throw new UnauthorizedException(
+        'Correo o contraseña incorrectos',
+      );
+    }
 
-  return {
-    message: 'Usuario registrado correctamente',
-    access_token:
-      await this.jwtService.signAsync(payload),
-    user: {
-      id: user.id,
-      name: user.name,
+    if (!user.is_active) {
+      throw new UnauthorizedException(
+        'El usuario está desactivado',
+      );
+    }
+
+    const passwordMatch =
+      await bcrypt.compare(
+        loginDto.password,
+        user.password,
+      );
+
+    if (!passwordMatch) {
+      throw new UnauthorizedException(
+        'Correo o contraseña incorrectos',
+      );
+    }
+
+    const payload = {
+      sub: user.id,
       email: user.email,
       role: user.role,
-    },
-  };
-}
-  async login(loginDto: LoginDto) {
-  console.log('========== LOGIN ==========');
-  console.log('Email recibido:', loginDto.email);
-  console.log('Password recibida:', loginDto.password);
+    };
 
-  const user = await this.usersService.findByEmail(
-    loginDto.email,
-  );
+    return {
+      access_token:
+        await this.jwtService
+          .signAsync(payload),
 
-  console.log('Usuario encontrado:', user);
-
-  if (!user) {
-    console.log('NO EXISTE EL USUARIO');
-    throw new UnauthorizedException(
-      'Correo o contraseña incorrectos',
-    );
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        is_active:
+          user.is_active,
+      },
+    };
   }
-
-  console.log('Password guardada:', user.password);
-
-  const passwordMatch = await bcrypt.compare(
-    loginDto.password,
-    user.password,
-  );
-
-  console.log('Coinciden:', passwordMatch);
-
-  if (!passwordMatch) {
-    console.log('PASSWORD INCORRECTA');
-    throw new UnauthorizedException(
-      'Correo o contraseña incorrectos',
-    );
-  }
-
-  const payload = {
-    sub: user.id,
-    email: user.email,
-    role: user.role,
-  };
-
-  return {
-    access_token: await this.jwtService.signAsync(payload),
-    user: {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-    },
-  };
-}
 }

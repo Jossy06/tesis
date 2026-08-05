@@ -11,19 +11,29 @@ export class Setting {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
+  @Column({
+    length: 150,
+  })
   business_name: string;
 
-  @Column()
+  @Column({
+    length: 20,
+  })
   ruc: string;
 
-  @Column()
+  @Column({
+    type: 'text',
+  })
   address: string;
 
-  @Column()
+  @Column({
+    length: 30,
+  })
   phone: string;
 
-  @Column()
+  @Column({
+    length: 150,
+  })
   email: string;
 
   @Column('decimal', {
@@ -32,6 +42,12 @@ export class Setting {
     default: 15,
   })
   iva_percentage: number;
+
+  @Column({
+    type: 'text',
+    nullable: true,
+  })
+  terms_conditions: string | null;
 
   @CreateDateColumn()
   created_at: Date;
