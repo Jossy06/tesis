@@ -1,22 +1,9 @@
-import {
-  Module,
-} from '@nestjs/common';
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 
-import {
-  TypeOrmModule,
-} from '@nestjs/typeorm';
-
-import {
-  Client,
-} from './entities/client.entity';
-
-import {
-  ClientsService,
-} from './clients.service';
-
-import {
-  ClientsController,
-} from './clients.controller';
+import { ClientsController } from './clients.controller';
+import { ClientsService } from './clients.service';
+import { Client } from './entities/client.entity';
 
 @Module({
   imports: [
@@ -24,15 +11,12 @@ import {
       Client,
     ]),
   ],
-
   controllers: [
     ClientsController,
   ],
-
   providers: [
     ClientsService,
   ],
-
   exports: [
     ClientsService,
   ],

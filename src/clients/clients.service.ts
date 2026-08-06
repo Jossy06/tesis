@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -9,12 +10,9 @@ import {
 } from '@nestjs/typeorm';
 
 import {
+  QueryFailedError,
   Repository,
 } from 'typeorm';
-
-import {
-  Client,
-} from './entities/client.entity';
 
 import {
   CreateClientDto,
@@ -23,6 +21,16 @@ import {
 import {
   UpdateClientDto,
 } from './dto/update-client.dto';
+
+import {
+  Client,
+} from './entities/client.entity';
+
+interface PostgreSqlError {
+  code?: string;
+  detail?: string;
+  constraint?: string;
+}
 
 @Injectable()
 export class ClientsService {
@@ -33,26 +41,26 @@ export class ClientsService {
   ) {}
 
   async create(
-    dto: CreateClientDto,
-    userId: string,
+    createClientDto:
+      CreateClientDto,
   ): Promise<Client> {
-    const email =
-      dto.email
-        ?.trim()
-        .toLowerCase() ||
-      null;
+    const normalizedEmail =
+      this.normalizeEmail(
+        createClientDto.email,
+      );
 
-    if (email) {
-      const existing =
-        await this.clientRepository.findOne({
+    if (normalizedEmail) {
+      const emailExists =
+        await this.clientRepository.exists({
           where: {
-            email,
+            email:
+              normalizedEmail,
           },
         });
 
-      if (existing) {
+      if (emailExists) {
         throw new ConflictException(
-          'El correo ya está registrado',
+          'El correo electrónico ya está registrado.',
         );
       }
     }
@@ -60,35 +68,39 @@ export class ClientsService {
     const client =
       this.clientRepository.create({
         name:
-          dto.name.trim(),
+          createClientDto.name.trim(),
 
         phone:
-          dto.phone.trim(),
+          createClientDto.phone.trim(),
 
-        email,
+        email:
+          normalizedEmail,
 
         address:
-          dto.address?.trim() ||
-          null,
-
-        created_by_user_id:
-          userId,
+          createClientDto.address
+            ?.trim() || null,
       });
 
-    return this.clientRepository.save(
-      client,
-    );
+    try {
+      return await this.clientRepository.save(
+        client,
+      );
+    } catch (
+      error: unknown
+    ) {
+      this.handleDatabaseError(
+        error,
+        'No se pudo registrar el cliente.',
+      );
+    }
   }
 
   async findAll():
     Promise<Client[]> {
     return this.clientRepository.find({
-      relations: {
-        created_by: true,
-      },
-
       order: {
-        created_at: 'DESC',
+        created_at:
+          'DESC',
       },
     });
   }
@@ -101,15 +113,11 @@ export class ClientsService {
         where: {
           id,
         },
-
-        relations: {
-          created_by: true,
-        },
       });
 
     if (!client) {
       throw new NotFoundException(
-        'Cliente no encontrado',
+        'Cliente no encontrado.',
       );
     }
 
@@ -118,69 +126,91 @@ export class ClientsService {
 
   async update(
     id: string,
-    dto: UpdateClientDto,
+
+    updateClientDto:
+      UpdateClientDto,
   ): Promise<Client> {
     const client =
       await this.findOne(id);
 
     if (
-      dto.email !== undefined
+      updateClientDto.email !==
+      undefined
     ) {
-      const email =
-        dto.email
-          ?.trim()
-          .toLowerCase() ||
-        null;
+      const normalizedEmail =
+        this.normalizeEmail(
+          updateClientDto.email,
+        );
 
-      if (
-        email &&
-        email !== client.email
-      ) {
-        const existing =
-          await this.clientRepository.findOne({
-            where: {
-              email,
-            },
-          });
+      if (normalizedEmail) {
+        const emailExists =
+          await this.clientRepository
+            .createQueryBuilder(
+              'client',
+            )
+            .where(
+              'LOWER(client.email) = LOWER(:email)',
+              {
+                email:
+                  normalizedEmail,
+              },
+            )
+            .andWhere(
+              'client.id != :id',
+              {
+                id,
+              },
+            )
+            .getExists();
 
-        if (
-          existing &&
-          existing.id !== id
-        ) {
+        if (emailExists) {
           throw new ConflictException(
-            'El correo ya está registrado',
+            'El correo electrónico ya está registrado por otro cliente.',
           );
         }
       }
 
-      client.email = email;
+      client.email =
+        normalizedEmail;
     }
 
     if (
-      dto.name !== undefined
+      updateClientDto.name !==
+      undefined
     ) {
       client.name =
-        dto.name.trim();
+        updateClientDto.name.trim();
     }
 
     if (
-      dto.phone !== undefined
+      updateClientDto.phone !==
+      undefined
     ) {
       client.phone =
-        dto.phone.trim();
+        updateClientDto.phone.trim();
     }
 
     if (
-      dto.address !== undefined
+      updateClientDto.address !==
+      undefined
     ) {
       client.address =
-        dto.address?.trim() ||
-        null;
+        updateClientDto.address
+          ?.trim() || null;
     }
 
-    return this.clientRepository.save(
-      client,
-    );
+    try {
+      return await this.clientRepository.save(
+        client,
+      );
+    } catch (
+      error: unknown
+    ) {
+      this.handleDatabaseError(
+        error,
+        'No se pudo actualizar el cliente.',
+      );
+    }
   }
 
   async remove(
@@ -191,13 +221,93 @@ export class ClientsService {
     const client =
       await this.findOne(id);
 
-    await this.clientRepository.remove(
-      client,
-    );
+    try {
+      await this.clientRepository.remove(
+        client,
+      );
 
-    return {
-      message:
-        'Cliente eliminado correctamente',
-    };
+      return {
+        message:
+          'Cliente eliminado correctamente.',
+      };
+    } catch (
+      error: unknown
+    ) {
+      if (
+        error instanceof
+        QueryFailedError
+      ) {
+        const databaseError =
+          error.driverError as
+            PostgreSqlError;
+
+        /*
+         * 23503:
+         * violación de clave foránea.
+         *
+         * 23001:
+         * violación de restricción.
+         */
+        if (
+          databaseError.code ===
+            '23503' ||
+          databaseError.code ===
+            '23001'
+        ) {
+          throw new ConflictException(
+            'No se puede eliminar el cliente porque posee citas, cálculos o facturas relacionadas. El historial debe conservarse.',
+          );
+        }
+      }
+
+      throw new BadRequestException(
+        'No se pudo eliminar el cliente.',
+      );
+    }
+  }
+
+  private normalizeEmail(
+    email:
+      | string
+      | null
+      | undefined,
+  ): string | null {
+    const normalized =
+      email
+        ?.trim()
+        .toLowerCase();
+
+    return normalized || null;
+  }
+
+  private handleDatabaseError(
+    error: unknown,
+    defaultMessage: string,
+  ): never {
+    if (
+      error instanceof
+      QueryFailedError
+    ) {
+      const databaseError =
+        error.driverError as
+          PostgreSqlError;
+
+      /*
+       * 23505:
+       * valor único duplicado.
+       */
+      if (
+        databaseError.code ===
+        '23505'
+      ) {
+        throw new ConflictException(
+          'El correo electrónico ya está registrado.',
+        );
+      }
+    }
+
+    throw new BadRequestException(
+      defaultMessage,
+    );
   }
 }

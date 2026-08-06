@@ -15,20 +15,50 @@ import {
   AppModule,
 } from './app.module';
 
-async function bootstrap() {
+async function bootstrap(): Promise<void> {
   const app =
     await NestFactory.create(
       AppModule,
     );
 
   app.enableCors({
-    origin: [
-      'http://localhost:4200',
-      'http://192.168.100.47:4200',
-    ],
+    origin: (
+      origin,
+      callback,
+    ) => {
+      const allowedOrigins = [
+        'http://localhost:4200',
+        'http://127.0.0.1:4200',
+        'http://192.168.100.47:4200',
+      ];
 
-    credentials:
-      true,
+      /*
+       * Permite solicitudes sin origin,
+       * como Swagger, Postman y aplicaciones móviles.
+       */
+      if (
+        !origin ||
+        allowedOrigins.includes(
+          origin,
+        )
+      ) {
+        callback(
+          null,
+          true,
+        );
+
+        return;
+      }
+
+      callback(
+        new Error(
+          `Origen no permitido por CORS: ${origin}`,
+        ),
+        false,
+      );
+    },
+
+    credentials: true,
 
     methods: [
       'GET',
@@ -42,29 +72,27 @@ async function bootstrap() {
     allowedHeaders: [
       'Content-Type',
       'Authorization',
+      'Accept',
+      'Origin',
+      'X-Requested-With',
     ],
   });
 
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist:
-        true,
-
-      transform:
-        true,
-
-      forbidNonWhitelisted:
-        true,
+      whitelist: true,
+      transform: true,
+      forbidNonWhitelisted: true,
     }),
   );
 
   const swaggerConfig =
     new DocumentBuilder()
       .setTitle(
-        "Kathy's Nails API",
+        "Kathy's Spa API",
       )
       .setDescription(
-        'API del sistema de costos y gestión del salón',
+        'API del sistema de control de costos y ganancias',
       )
       .setVersion(
         '1.0',
@@ -90,23 +118,15 @@ async function bootstrap() {
   );
 
   console.log(
-    'Backend disponible en:',
+    'Backend local: http://localhost:3000',
   );
 
   console.log(
-    'http://localhost:3000',
+    'Backend en red: http://192.168.100.47:3000',
   );
 
   console.log(
-    'http://192.168.100.47:3000',
-  );
-
-  console.log(
-    'Swagger:',
-  );
-
-  console.log(
-    'http://192.168.100.47:3000/api',
+    'Swagger: http://192.168.100.47:3000/api',
   );
 }
 

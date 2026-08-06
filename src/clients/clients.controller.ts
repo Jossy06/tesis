@@ -9,7 +9,6 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
-  Req,
   UseGuards,
 } from '@nestjs/common';
 
@@ -18,15 +17,31 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { ClientsService } from './clients.service';
-import { CreateClientDto } from './dto/create-client.dto';
-import { UpdateClientDto } from './dto/update-client.dto';
-import { Client } from './entities/client.entity';
+import {
+  JwtAuthGuard,
+} from '../auth/guards/jwt-auth.guard';
+
+import {
+  ClientsService,
+} from './clients.service';
+
+import {
+  CreateClientDto,
+} from './dto/create-client.dto';
+
+import {
+  UpdateClientDto,
+} from './dto/update-client.dto';
+
+import {
+  Client,
+} from './entities/client.entity';
 
 @ApiTags('Clients')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(
+  JwtAuthGuard,
+)
 @Controller('clients')
 export class ClientsController {
   constructor(
@@ -39,18 +54,15 @@ export class ClientsController {
     @Body()
     createClientDto:
       CreateClientDto,
-
-    @Req()
-    req: any,
   ): Promise<Client> {
     return this.clientsService.create(
       createClientDto,
-      req.user.id,
     );
   }
 
   @Get()
-  findAll(): Promise<Client[]> {
+  findAll():
+    Promise<Client[]> {
     return this.clientsService.findAll();
   }
 
@@ -59,7 +71,8 @@ export class ClientsController {
     @Param(
       'id',
       new ParseUUIDPipe({
-        version: '4',
+        version:
+          '4',
       }),
     )
     id: string,
@@ -74,7 +87,8 @@ export class ClientsController {
     @Param(
       'id',
       new ParseUUIDPipe({
-        version: '4',
+        version:
+          '4',
       }),
     )
     id: string,
@@ -90,12 +104,15 @@ export class ClientsController {
   }
 
   @Delete(':id')
-  @HttpCode(HttpStatus.OK)
+  @HttpCode(
+    HttpStatus.OK,
+  )
   remove(
     @Param(
       'id',
       new ParseUUIDPipe({
-        version: '4',
+        version:
+          '4',
       }),
     )
     id: string,
